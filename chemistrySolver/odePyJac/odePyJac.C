@@ -91,7 +91,7 @@ void Foam::odePyJac<ChemistryModel>::solve
 		csum += c[i];
     }
 	// Update the last species
-	c[nSpecie-1] = 1.0 -csum;
+	c[nSpecie-1] = 1.0 - csum;
 }
 
 

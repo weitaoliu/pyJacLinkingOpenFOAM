@@ -30,7 +30,7 @@ Description
     An ODE solver for chemistry
 
 SourceFiles
-    ode.C
+    odePyJac.C
 
 \*---------------------------------------------------------------------------*/
 
