@@ -67,22 +67,31 @@ void Foam::odePyJac<ChemistryModel>::solve
 
     const label nSpecie = this->nSpecie();
 
-    // Copy the concentration, T and P to the total solve-vector
-    for (int i=0; i<nSpecie; i++)
-    {
-        cTp_[i] = c[i];
-    }
-    cTp_[nSpecie] = T;
-    cTp_[nSpecie+1] = p;
 
+    // Copy the concentration, T and P to the total solve-vector
+    cTp_[0] = p;
+    cTp_[1] = T;
+
+	// Update for N-1 species
+    for (int i=0; i<nSpecie-1; i++)
+    {
+        cTp_[i+2] = c[i];
+    }
+
+	// Call ODE solvers
     odeSolver_->solve(0, deltaT, cTp_, subDeltaT);
 
+	p = cTp_[0];
+	T = cTp_[1];
+	scalar csum = 0;
+
     for (int i=0; i<nSpecie; i++)
     {
-        c[i] = max(0.0, cTp_[i]);
+        c[i] = max(0.0, cTp_[i+2]);
+		csum += c[i];
     }
-    T = cTp_[nSpecie];
-    p = cTp_[nSpecie+1];
+	// Update the last species
+	c[nSpecie-1] = 1.0 -csum;
 }
 
 

@@ -46,6 +46,13 @@ SourceFiles
 #include "volFields.H"
 #include "simpleMatrix.H"
 
+// Headers from pyJac
+extern "C" {
+    #include "chem_utils.h"
+    #include "dydt.h"
+    #include "jacob.h"
+};
+
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam
@@ -117,6 +124,12 @@ protected:
 
         //- Temporary rate-of-change of concentration field
         mutable scalarField dcdt_;
+
+		//- Enthalpy of formation for every species, from PyJac
+		scalarList sp_enthalpy_;
+
+		//- Number of elements specified in the reaction file
+		label nElements_;
 
 
     // Protected Member Functions

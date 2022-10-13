@@ -609,6 +609,12 @@ $(WM_PROJECT_DIR)/src/thermophysicalModels/specie/lnInclude/Reaction.C \
 $(WM_PROJECT_DIR)/src/ODE/lnInclude/ODESystem.H \
 $(WM_PROJECT_DIR)/src/OpenFOAM/lnInclude/simpleMatrix.H \
 $(WM_PROJECT_DIR)/src/OpenFOAM/lnInclude/simpleMatrix.C \
+pyJacInclude/chem_utils.h \
+pyJacInclude/header.h \
+pyJacInclude/mechanism.h \
+pyJacInclude/dydt.h \
+pyJacInclude/jacob.h \
+pyJacInclude/rates.h \
 lnInclude/PyJacChemistryModelI.H \
 $(WM_PROJECT_DIR)/src/finiteVolume/lnInclude/zeroGradientFvPatchFields.H \
 $(WM_PROJECT_DIR)/src/finiteVolume/lnInclude/zeroGradientFvPatchField.H \

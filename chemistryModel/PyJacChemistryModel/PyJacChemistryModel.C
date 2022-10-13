@@ -64,7 +64,9 @@ Foam::PyJacChemistryModel<ReactionThermo, ThermoType>::PyJacChemistryModel
     ),
     RR_(nSpecie_),
     c_(nSpecie_),
-    dcdt_(nSpecie_)
+    dcdt_(nSpecie_),
+	sp_enthalpy_(nSpecie_),
+	nElements_(BasicChemistryModel<ReactionThermo>::template get<label>("nElements"))
 {
     // Create the fields for the chemistry sources
     forAll(RR_, fieldi)
@@ -90,6 +92,22 @@ Foam::PyJacChemistryModel<ReactionThermo, ThermoType>::PyJacChemistryModel
 
     Info<< "PyJacChemistryModel: Number of species = " << nSpecie_
         << " and reactions = " << nReaction_ << endl;
+
+    // Note that nReaction_ should be updated with PyJAC
+    // PERHAPS TO OVERWRITE IN THE SRC DURING DYNAMIC BINDING
+	Info << "PyJacChemistryModel: Number of elements = " << nElements_ << endl;
+
+	if (this->chemistry_) {
+		Info << "\nEvaluting species enthalpy of formation using PyJac.\n";
+		//- Enthalpy of formation for all species
+		std::vector<scalar> sp_enth_form(nSpecie_, 0.0);
+		//- Enthalpy of formation is taken from PyJac at T-standard (chem_utils.h)
+		eval_h(298.15, sp_enth_form.data());
+		for (label i = 0; i < nSpecie_; ++i)
+		{
+			sp_enthalpy_[i] = sp_enth_form[i];
+		}
+	}
 }
 
 
@@ -284,45 +302,43 @@ void Foam::PyJacChemistryModel<ReactionThermo, ThermoType>::derivatives
     scalarField& dcdt
 ) const
 {
-    const scalar T = c[nSpecie_];
-    const scalar p = c[nSpecie_ + 1];
+    std::vector<double> TY(nSpecie_+1, 0.0);
+    // if TY has N+1 elements, diff(TY) has N elements
+    std::vector<double> dTYdt(nSpecie_, 0.0);
 
+
+    const scalar p = c[0];
+    const scalar T = c[1];
+
+
+    scalar csum = 0.0;
     forAll(c_, i)
     {
-        c_[i] = max(c[i], 0.0);
+        c_[i] = max(c[i+2], 0.0);
+        csum += c_[i];
     }
 
-    omega(c_, T, p, dcdt);
+    // Then we exclude last species from csum and dump all residuals
+    // into last species to ensure mass conservation
+    csum -= c_[nSpecie_-1];
+    c_[nSpecie_-1] = 1.0 - csum;
 
-    // Constant pressure
-    // dT/dt = ...
-    scalar rho = 0.0;
-    scalar cSum = 0.0;
-    for (label i = 0; i < nSpecie_; i++)
+    TY[0] = T;
+    forAll(c_, i)
+    { 
+        TY[i+1] = c_[i];
+    }
+
+    dydt(0, p, TY.data(), dTYdt.data());
+
+    // dp/dt = 0
+    dcdt[0] = 0.0;
+
+    // Back substitute into dcdt (dcdt has nSpecie+1 elements for diff(PTY))
+    for (label i = 0; i < nSpecie_; ++i)
     {
-        const scalar W = specieThermo_[i].W();
-        cSum += c_[i];
-        rho += W*c_[i];
+        dcdt[i+1] = dTYdt[i];
     }
-    scalar cp = 0.0;
-    for (label i=0; i<nSpecie_; i++)
-    {
-        cp += c_[i]*specieThermo_[i].cp(p, T);
-    }
-    cp /= rho;
-
-    scalar dT = 0.0;
-    for (label i = 0; i < nSpecie_; i++)
-    {
-        const scalar hi = specieThermo_[i].ha(p, T);
-        dT += hi*dcdt[i];
-    }
-    dT /= rho*cp;
-
-    dcdt[nSpecie_] = -dT;
-
-    // dp/dt = ...
-    dcdt[nSpecie_ + 1] = 0.0;
 }
 
 
@@ -335,136 +351,62 @@ void Foam::PyJacChemistryModel<ReactionThermo, ThermoType>::jacobian
     scalarSquareMatrix& dfdc
 ) const
 {
-    const scalar T = c[nSpecie_];
-    const scalar p = c[nSpecie_ + 1];
+    std::vector<double> TY(nSpecie_+1, 0.0);
+    std::vector<double> dfdy(nSpecie_*nSpecie_, 0.0);
+
+
+    const scalar p = c[0];
+    const scalar T = c[1];
+
+	scalar csum = 0.0;
 
     forAll(c_, i)
     {
-        c_[i] = max(c[i], 0.0);
+        c_[i] = max(c[i+2], 0.0);
+		csum += c_[i];
     }
+	
+    // Then we exclude last species from csum and instead dump all
+    // residuals into last species to ensure mass conservation
+    csum -= c_[nSpecie_-1];
+    c_[nSpecie_-1] = 1.0 - csum;
 
     dfdc = Zero;
 
-    // Length of the first argument must be nSpecie_
-    omega(c_, T, p, dcdt);
+	TY[0] = T;
 
-    forAll(reactions_, ri)
+    // Assign nSpecies-1 species mass fractions to the TY vector
+    forAll(c_, i)
     {
-        const Reaction<ThermoType>& R = reactions_[ri];
+        TY[i+1] = c_[i];
+    }
 
-        const scalar kf0 = R.kf(p, T, c_);
-        const scalar kr0 = R.kr(kf0, p, T, c_);
+	eval_jacob(0, p, TY.data(), dfdy.data());
 
-        forAll(R.lhs(), j)
+	// Back substitution to update dfdc
+	
+	// Assign first row and column to zero as they correspond to const pressure
+    for (label j = 0; j < nSpecie_ + 1; ++j)
+    {
+        dfdc(0,j) = 0.0;
+        dfdc(j,0) = 0.0;
+    }
+
+	label k = 0;
+	// Loop over cols
+    for (label j = 1; j < nSpecie_+1; ++j)
+    {
+        // Loop rows
+        for (label i = 1; i < nSpecie_+1; ++i)
         {
-            const label sj = R.lhs()[j].index;
-            scalar kf = kf0;
-            forAll(R.lhs(), i)
-            {
-                const label si = R.lhs()[i].index;
-                const scalar el = R.lhs()[i].exponent;
-                if (i == j)
-                {
-                    if (el < 1.0)
-                    {
-                        if (c_[si] > SMALL)
-                        {
-                            kf *= el*pow(c_[si], el - 1.0);
-                        }
-                        else
-                        {
-                            kf = 0.0;
-                        }
-                    }
-                    else
-                    {
-                        kf *= el*pow(c_[si], el - 1.0);
-                    }
-                }
-                else
-                {
-                    kf *= pow(c_[si], el);
-                }
-            }
-
-            forAll(R.lhs(), i)
-            {
-                const label si = R.lhs()[i].index;
-                const scalar sl = R.lhs()[i].stoichCoeff;
-                dfdc(si, sj) -= sl*kf;
-            }
-            forAll(R.rhs(), i)
-            {
-                const label si = R.rhs()[i].index;
-                const scalar sr = R.rhs()[i].stoichCoeff;
-                dfdc(si, sj) += sr*kf;
-            }
+            dfdc(i,j) = dfdy[k + i - 1];
+            //TODO chemJacobian_(i-1,j-1) = dfdy[k + i - 1];
         }
-
-        forAll(R.rhs(), j)
-        {
-            const label sj = R.rhs()[j].index;
-            scalar kr = kr0;
-            forAll(R.rhs(), i)
-            {
-                const label si = R.rhs()[i].index;
-                const scalar er = R.rhs()[i].exponent;
-                if (i == j)
-                {
-                    if (er < 1.0)
-                    {
-                        if (c_[si] > SMALL)
-                        {
-                            kr *= er*pow(c_[si], er - 1.0);
-                        }
-                        else
-                        {
-                            kr = 0.0;
-                        }
-                    }
-                    else
-                    {
-                        kr *= er*pow(c_[si], er - 1.0);
-                    }
-                }
-                else
-                {
-                    kr *= pow(c_[si], er);
-                }
-            }
-
-            forAll(R.lhs(), i)
-            {
-                const label si = R.lhs()[i].index;
-                const scalar sl = R.lhs()[i].stoichCoeff;
-                dfdc(si, sj) += sl*kr;
-            }
-            forAll(R.rhs(), i)
-            {
-                const label si = R.rhs()[i].index;
-                const scalar sr = R.rhs()[i].stoichCoeff;
-                dfdc(si, sj) -= sr*kr;
-            }
-        }
+        k += nSpecie_;
     }
-
-    // Calculate the dcdT elements numerically
-    const scalar delta = 1.0e-3;
-
-    omega(c_, T + delta, p, dcdt_);
-    for (label i=0; i<nSpecie_; i++)
-    {
-        dfdc(i, nSpecie_) = dcdt_[i];
-    }
-
-    omega(c_, T - delta, p, dcdt_);
-    for (label i=0; i<nSpecie_; i++)
-    {
-        dfdc(i, nSpecie_) = 0.5*(dfdc(i, nSpecie_) - dcdt_[i])/delta;
-    }
-
-    dfdc(nSpecie_, nSpecie_) = 0;
-    dfdc(nSpecie_ + 1, nSpecie_) = 0;
+	
+    // Note that dcdt is not needed in most ODE solvers so here we just return 0
+    dcdt = Zero;
 }
 
 
@@ -572,7 +514,8 @@ Foam::PyJacChemistryModel<ReactionThermo, ThermoType>::Qdot() const
         {
             forAll(Qdot, celli)
             {
-                const scalar hi = specieThermo_[i].Hc();
+                // const scalar hi = specieThermo_[i].Hc();
+                scalar hi = sp_enthalpy_[i];
                 Qdot[celli] -= hi*RR_[i][celli];
             }
         }

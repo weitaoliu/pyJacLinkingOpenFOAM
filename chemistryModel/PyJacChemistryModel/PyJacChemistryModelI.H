@@ -34,8 +34,11 @@ template<class ReactionThermo, class ThermoType>
 inline Foam::label
 Foam::PyJacChemistryModel<ReactionThermo, ThermoType>::nEqns() const
 {
-    // nEqns = number of species + temperature + pressure
-    return nSpecie_ + 2;
+    // // nEqns = number of species + temperature + pressure
+    // return nSpecie_ + 2;
+	
+    // nEqns = number of species (N-1) + temperature + pressure
+    return nSpecie_ + 1;
 }
 
 
