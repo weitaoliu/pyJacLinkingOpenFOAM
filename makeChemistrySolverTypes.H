@@ -74,19 +74,6 @@ License
 
 #define makeChemistrySolverTypes(Comp, Thermo)                                 \
                                                                                \
-    makeChemistrySolverType                                                    \
-    (                                                                          \
-        noChemistrySolver,                                                     \
-        Comp,                                                                  \
-        Thermo                                                                 \
-    );                                                                         \
-                                                                               \
-    makeChemistrySolverType                                                    \
-    (                                                                          \
-        EulerImplicit,                                                         \
-        Comp,                                                                  \
-        Thermo                                                                 \
-    );                                                                         \
                                                                                \
     makeChemistrySolverType                                                    \
     (                                                                          \
