@@ -695,7 +695,7 @@ Foam::scalar Foam::PyJacChemistryModel<ReactionThermo, ThermoType>::solve
                 //    (c_[i] - c0[i])*specieThermo_[i].W()/deltaT[celli];
 
 				//- source is updated based on mass fraction instead of concentration
-				this->RR_[i][celli] = rhoi*(this->c_[i] - c_[0])/deltaT[celli];
+				this->RR_[i][celli] = rhoi*(this->c_[i] - c0[i])/deltaT[celli];
             }
         }
         else

@@ -31,7 +31,7 @@ License
 #include "chemistrySolver.H"
 
 #include "PyJacChemistryModel.H"
-#include "TDACChemistryModel.H"
+// #include "TDACChemistryModel.H"
 
 #include "noChemistrySolver.H"
 #include "EulerImplicit.H"
@@ -55,22 +55,7 @@ License
         add##thermo##ConstructorToTable<SS##Comp##Thermo>                      \
         add##SS##Comp##Thermo##thermo##ConstructorTo##BasicChemistryModel##Comp\
 ##Table_;                                                                      \
-                                                                               \
-    typedef SS<TDACChemistryModel<Comp, Thermo>> TDAC##SS##Comp##Thermo;       \
-                                                                               \
-    defineTemplateTypeNameAndDebugWithName                                     \
-    (                                                                          \
-        TDAC##SS##Comp##Thermo,                                                \
-        (#SS"<" + word(TDACChemistryModel<Comp, Thermo>::typeName_()) + "<"    \
-        + word(Comp::typeName_()) + "," + Thermo::typeName() + ">>").c_str(),  \
-        0                                                                      \
-    );                                                                         \
-                                                                               \
-    BasicChemistryModel<Comp>::                                                \
-        add##thermo##ConstructorToTable<TDAC##SS##Comp##Thermo>                \
-        add##TDAC##SS##Comp##Thermo##thermo##ConstructorTo##BasicChemistryModel\
-##Comp##Table_;
-
+                                                                               
 
 #define makeChemistrySolverTypes(Comp, Thermo)                                 \
                                                                                \

@@ -37,7 +37,7 @@ Description
 #include "rhoReactionThermo.H"
 
 #include "PyJacChemistryModel.H"
-#include "TDACChemistryModel.H"
+// #include "TDACChemistryModel.H"
 #include "thermoPhysicsTypes.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

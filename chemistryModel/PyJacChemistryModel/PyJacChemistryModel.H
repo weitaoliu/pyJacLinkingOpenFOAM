@@ -142,7 +142,7 @@ protected:
 public:
 
     //- Runtime type information
-    TypeName("standard");
+    TypeName("pyJac");
 
 
     // Constructors
